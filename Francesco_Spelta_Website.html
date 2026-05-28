@@ -944,7 +944,12 @@ footer { background: #1A1008; padding: 80px 0 48px; border-top: 1px solid rgba(2
       <p class="body-text">Select your products and quantities. We will contact you within 48 hours to confirm delivery schedule, timing, and pricing.</p>
     </div>
 
-    <div id="order-form-container">
+    <form id="order-form-container" name="order-enquiry" method="POST"
+          data-netlify="true" data-netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name"     value="order-enquiry">
+      <input type="hidden" name="enquiry-type"  id="h-enquiry-type" value="order">
+      <input type="hidden" name="order-summary" id="h-order-summary" value="">
+      <p style="display:none"><label>Do not fill: <input name="bot-field"></label></p>
 
       <!-- Enquiry type -->
       <div class="enquiry-type">
@@ -1067,10 +1072,10 @@ footer { background: #1A1008; padding: 80px 0 48px; border-top: 1px solid rgba(2
 
       <div class="order-submit">
         <p class="order-note-text" id="submit-note">We will contact you within 48 hours to confirm delivery schedule, timing, and pricing.</p>
-        <button class="btn-submit" id="submitBtn" onclick="sendOrder()">Send Enquiry</button>
+        <button type="button" class="btn-submit" id="submitBtn" onclick="sendOrder()">Send Enquiry</button>
       </div>
 
-    </div><!-- /order-form-container -->
+    </form><!-- /order-form-container -->
 
     <!-- Success -->
     <div id="order-success">
@@ -1137,6 +1142,7 @@ function closeMobileNav() {
 let enquiryType = 'order';
 function setEnquiryType(type) {
   enquiryType = type;
+  document.getElementById('h-enquiry-type').value = type;
   document.getElementById('et-order-btn').classList.toggle('active', type === 'order');
   document.getElementById('et-dist-btn').classList.toggle('active', type === 'distribution');
   document.getElementById('product-selectors').style.display = type === 'order' ? '' : 'none';
@@ -1182,84 +1188,60 @@ document.getElementById('distCTABtn').addEventListener('click', function() {
   document.getElementById('order').scrollIntoView({ behavior: 'smooth' });
 });
 
-// ─── FORM SUBMISSION (mailto) ───
+// ─── FORM SUBMISSION (Netlify Forms) ───
 function sendOrder() {
-  // Basic validation
-  const name    = document.getElementById('f-name').value.trim();
-  const email   = document.getElementById('f-email').value.trim();
-  const company = document.getElementById('f-company').value.trim();
-  const country = document.getElementById('f-country').value.trim();
-  if (!name || !email || !company || !country) {
-    // Highlight missing fields
-    ['f-name','f-email','f-company','f-country'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (!el.value.trim()) el.style.borderTopColor = 'rgba(196,74,42,0.6)';
-      else el.style.borderTopColor = '';
-    });
-    return;
-  }
+  var name    = document.getElementById('f-name').value.trim();
+  var email   = document.getElementById('f-email').value.trim();
+  var company = document.getElementById('f-company').value.trim();
+  var country = document.getElementById('f-country').value.trim();
 
-  // Build order summary
+  // Validate required fields
+  var valid = true;
+  ['f-name','f-email','f-company','f-country'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el.value.trim()) { el.style.borderTopColor = 'rgba(196,74,42,0.6)'; valid = false; }
+    else el.style.borderTopColor = '';
+  });
+  if (!valid) return;
+
+  // Build product summary for the hidden field
   var products = [
-    { id: 'classic',   name: 'Salmone Classico',   q400: 'q-classic-400', q1kg: 'q-classic-1kg' },
-    { id: 'chocolate', name: 'Salmone Cioccolato',  q400: 'q-choc-400',    q1kg: 'q-choc-1kg'    },
-    { id: 'coffee',    name: 'Salmone Caffe',       q400: 'q-coffee-400',  q1kg: 'q-coffee-1kg'  },
+    { id: 'classic',   label: 'Salmone Classico',   q400: 'q-classic-400', q1kg: 'q-classic-1kg' },
+    { id: 'chocolate', label: 'Salmone Cioccolato',  q400: 'q-choc-400',    q1kg: 'q-choc-1kg'    },
+    { id: 'coffee',    label: 'Salmone Caffe',        q400: 'q-coffee-400',  q1kg: 'q-coffee-1kg'  },
   ];
-  var orderLines = [];
+  var lines = [];
   products.forEach(function(p) {
     if (document.getElementById('op-' + p.id).classList.contains('selected')) {
       var a = document.getElementById(p.q400).value || '0';
       var b = document.getElementById(p.q1kg).value || '0';
-      orderLines.push(p.name + ': ' + a + ' x 400g, ' + b + ' x 1kg');
+      lines.push(p.label + ': ' + a + ' x 400g, ' + b + ' x 1kg');
     }
   });
+  document.getElementById('h-order-summary').value = lines.length ? lines.join(' | ') : 'No products selected';
+  document.getElementById('h-enquiry-type').value  = enquiryType;
 
-  var phone   = document.getElementById('f-phone').value.trim();
-  var channel = document.getElementById('f-channel').value.trim();
-  var notes   = document.getElementById('f-notes').value.trim();
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
 
-  var subject, body;
-  if (enquiryType === 'distribution') {
-    subject = 'Distribution Enquiry — ' + company + ' (' + country + ')';
-    body  = 'DISTRIBUTION ENQUIRY\n';
-    body += '━━━━━━━━━━━━━━━━━━━━\n\n';
-    body += 'Name:     ' + name    + '\n';
-    body += 'Company:  ' + company + '\n';
-    body += 'Email:    ' + email   + '\n';
-    body += 'Phone:    ' + (phone || '—')   + '\n';
-    body += 'Country:  ' + country + '\n';
-    body += 'Channel:  ' + (channel || '—') + '\n\n';
-    body += 'Notes:\n' + (notes || '—') + '\n';
-  } else {
-    subject = 'Order Enquiry — ' + company + ' (' + country + ')';
-    body  = 'ORDER ENQUIRY\n';
-    body += '━━━━━━━━━━━━━━━━━━━━\n\n';
-    body += 'Name:     ' + name    + '\n';
-    body += 'Company:  ' + company + '\n';
-    body += 'Email:    ' + email   + '\n';
-    body += 'Phone:    ' + (phone || '—')   + '\n';
-    body += 'Country:  ' + country + '\n';
-    body += 'Channel:  ' + (channel || '—') + '\n\n';
-    body += 'ORDER DETAILS\n';
-    body += '━━━━━━━━━━━━━━━━━━━━\n';
-    if (orderLines.length > 0) {
-      orderLines.forEach(function(l) { body += l + '\n'; });
-    } else {
-      body += 'No products selected — client to advise.\n';
-    }
-    if (notes) { body += '\nNotes:\n' + notes + '\n'; }
-  }
-
-  window.location.href = 'mailto:' + ORDER_EMAIL
-    + '?subject=' + encodeURIComponent(subject)
-    + '&body='    + encodeURIComponent(body);
-
-  // Show success after short delay
-  setTimeout(function() {
-    document.getElementById('order-form-container').style.display = 'none';
-    document.getElementById('order-success').style.display = 'block';
-    document.getElementById('order-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 800);
+  var form = document.getElementById('order-form-container');
+  fetch('/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(new FormData(form)).toString()
+  })
+  .then(function() {
+    form.style.display = 'none';
+    var success = document.getElementById('order-success');
+    success.style.display = 'block';
+    success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  })
+  .catch(function() {
+    btn.disabled = false;
+    btn.textContent = 'Send Enquiry';
+    alert('Something went wrong. Please email us directly at info@francescospelta.com');
+  });
 }
 
 // ─── PACKAGING CAROUSEL ───
